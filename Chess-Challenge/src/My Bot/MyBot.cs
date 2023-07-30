@@ -44,17 +44,14 @@ public class MyBot : IChessBot
 
         foreach (Move move in moves){
             board.MakeMove(move);
+            int score = 0;
 
             if (board.IsInCheckmate()){
-                bestScore = int.MaxValue;
-                if (depth == searchDepth){
-                    this.bestMove = move;
-                }
-                board.UndoMove(move);
-                break;
+                score += pieceValues[6];
+            }else{
+                score += -Search(board, depth - 1);
             }
             
-            int score = -Search(board, depth - 1);
             board.UndoMove(move);
 
 
