@@ -5,14 +5,16 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 public class MyBot : IChessBot
 {
-    readonly int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
+    // Piece values: null, pawn, knight, bishop, rook, queen, king
+    readonly int[] pieceValues = { 0, 1, 3, 3, 5, 9, 100 };
     readonly int searchDepth = 4;
+    // readonly int alphaBetaLimit = 1
 
     private Move bestMove;
 
     public Move Think(Board board, Timer timer)
     {
-        Search(board, searchDepth);
+        Search(board, searchDepth, -1000, 1000);
         return this.bestMove;
 
     }
@@ -29,7 +31,7 @@ public class MyBot : IChessBot
         return totalValue;
     }
 
-    int Search (Board board, int depth){
+    int Search (Board board, int depth, int alpha, int beta){
         if (depth == 0){
             return Evaluate(board);
         }
@@ -40,8 +42,6 @@ public class MyBot : IChessBot
             return 0;
         }
 
-        int bestScore = int.MinValue;
-
         foreach (Move move in moves){
             board.MakeMove(move);
             int score = 0;
@@ -49,19 +49,22 @@ public class MyBot : IChessBot
             if (board.IsInCheckmate()){
                 score += pieceValues[6];
             }else{
-                score += -Search(board, depth - 1);
+                score += -Search(board, depth - 1, -beta, -alpha);
             }
             
             board.UndoMove(move);
+            if (score >= beta){
+                return beta;
+            }
 
-
-            if (score > bestScore){
-                bestScore = score;
+            if (score > alpha){
+                alpha = score;
                 if (depth == searchDepth){
                     this.bestMove = move;
                 }
+
             }
         }
-        return bestScore;
+        return alpha;
     }
 }
