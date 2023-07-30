@@ -1,14 +1,18 @@
 ﻿using System;
+using System.ComponentModel.DataAnnotations;
 using ChessChallenge.API;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 public class MyBot : IChessBot
 {
     readonly int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
+    readonly int searchDepth = 4;
 
     public Move Think(Board board, Timer timer)
     {
-        (_, Move bestMove) = Search(board,4);
-        return bestMove;
+        (_, Move moveToPlay) = Search(board, searchDepth);
+        return moveToPlay;
+
     }
 
     private int Evaluate(Board board)
@@ -23,13 +27,9 @@ public class MyBot : IChessBot
         return totalValue;
     }
 
-    private Tuple<int,Move> Search (Board board, int depth){
+    Tuple<int, Move> Search (Board board, int depth){
         if (depth == 0){
-            return new Tuple<int, Move>(Evaluate(board), Move.NullMove);
-        }
-
-        if (board.IsInCheckmate()){
-            return new Tuple<int, Move>(int.MinValue, Move.NullMove);
+            return new Tuple<int, Move>(Evaluate(board),Move.NullMove);
         }
 
         Move[] moves = board.GetLegalMoves();
@@ -38,20 +38,29 @@ public class MyBot : IChessBot
             return new Tuple<int, Move>(0, Move.NullMove);
         }
 
-        int bestEval = int.MinValue;
-        Random rng = new();
-        Move bestMove = moves[rng.Next(moves.Length)];
+        int bestScore = int.MinValue;
+        // Random rng = new();
+        // Move bestMove = moves[rng.Next(moves.Length)];
+        Move bestMove = moves[0];
 
         foreach (Move move in moves){
             board.MakeMove(move);
-            (int eval, Move temp) = Search(board, depth - 1);
-            eval = -eval;
-            if (eval > bestEval){
-                bestEval = eval;
+
+            if (board.IsInCheckmate()){
+                bestScore = int.MaxValue;
                 bestMove = move;
+                board.UndoMove(move);
+                break;
+            }
+            
+            (int score, _) = Search(board, depth - 1);
+            score = -score;
+            if (score > bestScore){
+                bestScore = score;
+                bestMove =  move;
             }
             board.UndoMove(move);
         }
-        return new Tuple<int, Move>(bestEval,bestMove);
+        return new Tuple<int, Move>(bestScore, bestMove);
     }
 }
