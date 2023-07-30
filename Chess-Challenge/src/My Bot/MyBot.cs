@@ -8,10 +8,12 @@ public class MyBot : IChessBot
     readonly int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
     readonly int searchDepth = 4;
 
+    private Move bestMove;
+
     public Move Think(Board board, Timer timer)
     {
-        (_, Move moveToPlay) = Search(board, searchDepth);
-        return moveToPlay;
+        Search(board, searchDepth);
+        return this.bestMove;
 
     }
 
@@ -27,40 +29,42 @@ public class MyBot : IChessBot
         return totalValue;
     }
 
-    Tuple<int, Move> Search (Board board, int depth){
+    int Search (Board board, int depth){
         if (depth == 0){
-            return new Tuple<int, Move>(Evaluate(board),Move.NullMove);
+            return Evaluate(board);
         }
 
         Move[] moves = board.GetLegalMoves();
 
         if (moves.Length == 0){
-            return new Tuple<int, Move>(0, Move.NullMove);
+            return 0;
         }
 
         int bestScore = int.MinValue;
-        // Random rng = new();
-        // Move bestMove = moves[rng.Next(moves.Length)];
-        Move bestMove = moves[0];
 
         foreach (Move move in moves){
             board.MakeMove(move);
 
             if (board.IsInCheckmate()){
                 bestScore = int.MaxValue;
-                bestMove = move;
+                if (depth == searchDepth){
+                    this.bestMove = move;
+                }
                 board.UndoMove(move);
                 break;
             }
             
-            (int score, _) = Search(board, depth - 1);
-            score = -score;
+            int score = -Search(board, depth - 1);
+            board.UndoMove(move);
+
+
             if (score > bestScore){
                 bestScore = score;
-                bestMove =  move;
+                if (depth == searchDepth){
+                    this.bestMove = move;
+                }
             }
-            board.UndoMove(move);
         }
-        return new Tuple<int, Move>(bestScore, bestMove);
+        return bestScore;
     }
 }
