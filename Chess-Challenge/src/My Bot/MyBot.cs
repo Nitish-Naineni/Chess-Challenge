@@ -47,6 +47,8 @@ public class MyBot : IChessBot
 
             if (board.IsInCheckmate()){
                 score += pieceValues[6];
+            }else if (board.IsDraw()){
+                score -= pieceValues[6]/2;
             }else{
                 ulong zKey = board.ZobristKey;
 
