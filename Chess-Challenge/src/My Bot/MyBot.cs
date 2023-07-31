@@ -36,6 +36,9 @@ public class MyBot : IChessBot
         }
 
         Move[] moves = board.GetLegalMoves();
+        Random rng = new();
+        int rngIndex = rng.Next(moves.Length);
+        (moves[0], moves[rngIndex]) = (moves[rngIndex], moves[0]);
 
         if (moves.Length == 0){
             return 0;
