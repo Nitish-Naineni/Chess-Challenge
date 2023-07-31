@@ -7,14 +7,15 @@ public class MyBot : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
     readonly int[] pieceValues = { 0, 1, 3, 3, 5, 9, 100 };
-    readonly int searchDepth = 4;
-    // readonly int alphaBetaLimit = 1
+    // readonly int[] initialPieceCounts = {8*4, 8, 2, 2, 2, 1, 1};
+    readonly int searchDepth = 5;
+    readonly int alphaBetaLimit = 139;
 
     private Move bestMove;
 
     public Move Think(Board board, Timer timer)
     {
-        Search(board, searchDepth, -1000, 1000);
+        Search(board, searchDepth, -alphaBetaLimit, alphaBetaLimit);
         return this.bestMove;
 
     }
