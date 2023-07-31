@@ -1,16 +1,14 @@
 ﻿using System;
-using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
 using ChessChallenge.API;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 public class MyBot : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
     readonly int[] pieceValues = { 0, 1, 3, 3, 5, 9, 100 };
-    // readonly int[] initialPieceCounts = {8*4, 8, 2, 2, 2, 1, 1};
-    readonly int searchDepth = 5;
+    readonly int searchDepth = 4;
     readonly int alphaBetaLimit = 139;
-
+    Dictionary<ulong, Tuple<int, int>> trans = new();
     private Move bestMove;
 
     public Move Think(Board board, Timer timer)
@@ -50,7 +48,16 @@ public class MyBot : IChessBot
             if (board.IsInCheckmate()){
                 score += pieceValues[6];
             }else{
-                score += -Search(board, depth - 1, -beta, -alpha);
+                ulong zKey = board.ZobristKey;
+
+                if (trans.TryGetValue(zKey, out var transValue) && transValue.Item2 >= depth){
+                    score += transValue.Item1;
+                }else{
+                    int partScore = -Search(board, depth - 1, -beta, -alpha);
+                    score += partScore;
+                    trans[zKey] = Tuple.Create(partScore, depth);
+                }
+
             }
             
             board.UndoMove(move);
