@@ -6,22 +6,36 @@ using ChessChallenge.API;
 public class MyBot : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
-    readonly int[] pieceValues = { 0, 1, 3, 3, 5, 9, 100 };
-    readonly int alphaBetaLimit = 139;
+    readonly int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
+    readonly int alphaBetaLimit = 13900;
     readonly TimeSpan timeout = TimeSpan.FromMilliseconds(1000);
-
+    readonly int delta = 50;
     Dictionary<ulong, Tuple<int, int>> trans = new();
     private Move bestMove;
     int searchDepth;
     DateTime startTime;
 
+
     public Move Think(Board board, Timer timer)
     {
+        int score = 0;
+        int aspirationAlpha = -alphaBetaLimit;
+        int aspirationBeta = alphaBetaLimit;
         startTime = DateTime.UtcNow;
         try{
             for (int i = 1; i < 10; i++){
                 searchDepth = i;
-                Search(board, searchDepth, -alphaBetaLimit, alphaBetaLimit);
+                if (searchDepth > 1){
+                    aspirationAlpha = score - delta;
+                    aspirationBeta = score + delta;
+                }
+                score = Search(board, searchDepth, aspirationAlpha, aspirationBeta);
+
+                if (score <= aspirationAlpha){
+                    score = Search(board, searchDepth, -alphaBetaLimit, aspirationBeta);
+                }else if (score >= aspirationBeta){
+                    score = Search(board, searchDepth, aspirationAlpha, alphaBetaLimit);
+                }
             }
         }catch(Exception){
             Console.WriteLine("Level {0} Move: " + bestMove.ToString(),searchDepth-1);
