@@ -1,21 +1,33 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Security.AccessControl;
 using ChessChallenge.API;
 
 public class MyBot : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
     readonly int[] pieceValues = { 0, 1, 3, 3, 5, 9, 100 };
-    readonly int searchDepth = 4;
     readonly int alphaBetaLimit = 139;
+    readonly TimeSpan timeout = TimeSpan.FromMilliseconds(1000);
+
     Dictionary<ulong, Tuple<int, int>> trans = new();
     private Move bestMove;
+    int searchDepth;
+    DateTime startTime;
 
     public Move Think(Board board, Timer timer)
     {
-        Search(board, searchDepth, -alphaBetaLimit, alphaBetaLimit);
-        return this.bestMove;
-
+        startTime = DateTime.UtcNow;
+        try{
+            for (int i = 1; i < 10; i++){
+                searchDepth = i;
+                Search(board, searchDepth, -alphaBetaLimit, alphaBetaLimit);
+            }
+        }catch(Exception){
+            Console.WriteLine("Level {0} Move: " + bestMove.ToString(),searchDepth-1);
+        }
+        
+        return bestMove;
     }
 
     private int Evaluate(Board board)
@@ -31,6 +43,7 @@ public class MyBot : IChessBot
     }
 
     int Search (Board board, int depth, int alpha, int beta){
+        if (DateTime.UtcNow - startTime > timeout){throw new Exception("Search Halted");}
         if (depth == 0){
             return Quiesce(board, alpha, beta);
         }
@@ -85,6 +98,7 @@ public class MyBot : IChessBot
 
 
     int Quiesce(Board board, int alpha, int beta) {
+        if (DateTime.UtcNow - startTime > timeout){throw new Exception("Search Halted");}
         int stand_pat = Evaluate(board);
         if (stand_pat >= beta)
             return beta;
