@@ -44,6 +44,8 @@ public class MyBot : IChessBot
             return 0;
         }
 
+        Move currentBestMove = moves[0];
+
         foreach (Move move in moves){
             board.MakeMove(move);
             int score = 0;
@@ -72,11 +74,11 @@ public class MyBot : IChessBot
 
             if (score > alpha){
                 alpha = score;
-                if (depth == searchDepth){
-                    this.bestMove = move;
-                }
-
+                currentBestMove = move;
             }
+        }
+        if (depth == searchDepth){
+            this.bestMove = currentBestMove;
         }
         return alpha;
     }
