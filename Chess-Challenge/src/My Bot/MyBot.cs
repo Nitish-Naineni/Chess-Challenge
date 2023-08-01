@@ -32,7 +32,7 @@ public class MyBot : IChessBot
 
     int Search (Board board, int depth, int alpha, int beta){
         if (depth == 0){
-            return Evaluate(board);
+            return Quiesce(board, alpha, beta);
         }
 
         Move[] moves = board.GetLegalMoves();
@@ -79,6 +79,28 @@ public class MyBot : IChessBot
         }
         if (depth == searchDepth){
             this.bestMove = currentBestMove;
+        }
+        return alpha;
+    }
+
+
+    int Quiesce(Board board, int alpha, int beta) {
+        int stand_pat = Evaluate(board);
+        if (stand_pat >= beta)
+            return beta;
+        if (alpha < stand_pat)
+            alpha = stand_pat;
+
+        Move[] captures = board.GetLegalMoves(true);
+        foreach (Move capture in captures) {
+            board.MakeMove(capture);
+            int score = -Quiesce(board, -beta, -alpha);
+            board.UndoMove(capture);
+
+            if (score >= beta)
+                return beta;
+            if (score > alpha)
+            alpha = score;
         }
         return alpha;
     }
