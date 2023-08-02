@@ -58,6 +58,12 @@ public class MyBot : IChessBot
 
     int Search (Board board, int depth, int alpha, int beta){
         if (DateTime.UtcNow - startTime > timeout){throw new Exception("Search Halted");}
+
+        ulong zKey = board.ZobristKey;
+        if (trans.ContainsKey(zKey) && trans[zKey].Item2 >= depth){
+            return trans[zKey].Item1;
+        }
+
         if (depth == 0){
             return Quiesce(board, alpha, beta);
         }
@@ -72,26 +78,15 @@ public class MyBot : IChessBot
         }
 
         Move currentBestMove = moves[0];
-
+        int score;
         foreach (Move move in moves){
             board.MakeMove(move);
-            int score = 0;
-
             if (board.IsInCheckmate()){
-                score += pieceValues[6];
+                score = pieceValues[6];
             }else if (board.IsDraw()){
-                score -= pieceValues[6]/2;
+                score = 0;
             }else{
-                ulong zKey = board.ZobristKey;
-
-                if (trans.TryGetValue(zKey, out var transValue) && transValue.Item2 >= depth){
-                    score += transValue.Item1;
-                }else{
-                    int partScore = -Search(board, depth - 1, -beta, -alpha);
-                    score += partScore;
-                    trans[zKey] = Tuple.Create(partScore, depth);
-                }
-
+                score = -Search(board, depth - 1, -beta, -alpha);
             }
             
             board.UndoMove(move);
@@ -107,6 +102,8 @@ public class MyBot : IChessBot
         if (depth == searchDepth){
             this.bestMove = currentBestMove;
         }
+
+        trans[zKey] = new Tuple<int, int>(alpha, depth);
         return alpha;
     }
 
