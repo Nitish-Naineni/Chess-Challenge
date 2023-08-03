@@ -18,10 +18,11 @@ public class MyBot : IChessBot
 
     public Move Think(Board board, Timer timer)
     {
-        int score = 0;
+        int score = int.MinValue;
         int aspirationAlpha = -alphaBetaLimit;
         int aspirationBeta = alphaBetaLimit;
         startTime = DateTime.UtcNow;
+        bestMove = Move.NullMove;
         try{
             for (int i = 1; i < 10; i++){
                 searchDepth = i;
