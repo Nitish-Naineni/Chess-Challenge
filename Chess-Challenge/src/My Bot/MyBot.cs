@@ -1,15 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Security.AccessControl;
 using ChessChallenge.API;
 
 public class MyBot : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
     readonly int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
-    readonly int alphaBetaLimit = 13900;
     readonly TimeSpan timeout = TimeSpan.FromMilliseconds(1000);
     Dictionary<ulong, Tuple<int, int, Move>> trans = new();
+    Dictionary<ulong, Move[]> moveHistroy;
     DateTime startTime;
 
 
@@ -18,12 +17,13 @@ public class MyBot : IChessBot
         int score;
         int bestSearchDepth = 0;
         Move moveToPlay = new();
+        moveHistroy = new();
         startTime = DateTime.UtcNow;
 
         try{
             for (int i = 1; i < 10; i++){
                 bestSearchDepth = i;
-                (score, moveToPlay) = Search(board, i, -alphaBetaLimit, alphaBetaLimit);
+                (score, moveToPlay) = Search(board, i, -13900, 13900);
             }
         }catch(Exception){
             Console.WriteLine("Level {0} Move: " + moveToPlay.ToString(),bestSearchDepth-1);
@@ -56,19 +56,25 @@ public class MyBot : IChessBot
             return new Tuple<int, Move>(Quiesce(board, alpha, beta), Move.NullMove);
         }
 
-        Move[] moves = board.GetLegalMoves();
-        Random rng = new();
-        int rngIndex = rng.Next(moves.Length);
-        (moves[0], moves[rngIndex]) = (moves[rngIndex], moves[0]);
+        Move[] moves;
+        if (moveHistroy.ContainsKey(zKey)){
+            moves = moveHistroy[zKey];
+        }else{
+            moves = OrderMoves(board.GetLegalMoves());
+        }
+        int[] moveScores = new int[moves.Length];
+        for (int i = 0; i < moveScores.Length; i++){moveScores[i] = int.MinValue;}
 
         if (moves.Length == 0){
             return new Tuple<int, Move>(0, Move.NullMove);
         }
 
-        Move bestMove = moves[0];
+        Random rng = new();
+        Move bestMove = moves[rng.Next(moves.Length)];
+
         int score;
-        foreach (Move move in moves){
-            board.MakeMove(move);
+        for (int i = 0; i < moves.Length; i++){
+            board.MakeMove(moves[i]);
             if (board.IsInCheckmate()){
                 score = pieceValues[6];
             }else if (board.IsDraw()){
@@ -76,17 +82,23 @@ public class MyBot : IChessBot
             }else{
                 score = -Search(board, depth - 1, -beta, -alpha).Item1;
             }
+
+            moveScores[i] = score;
             
-            board.UndoMove(move);
+            board.UndoMove(moves[i]);
             if (score >= beta){
                 return new Tuple<int, Move>(beta,Move.NullMove);
             }
 
             if (score > alpha){
                 alpha = score;
-                bestMove = move;
+                bestMove = moves[i];
             }
         }
+        Array.Sort(moveScores, moves);
+        Array.Reverse(moves);
+        moveHistroy[zKey] = moves;
+
         trans[zKey] = new Tuple<int, int, Move>(alpha, depth, bestMove);
         return new Tuple<int, Move>(alpha, bestMove);
     }
@@ -112,5 +124,20 @@ public class MyBot : IChessBot
             alpha = score;
         }
         return alpha;
+    }
+
+    Move[] OrderMoves(Move[] moves){
+        int[] moveScores = new int[moves.Length];
+        Random rng = new();
+        int s = rng.Next(moves.Length);
+        (moves[s], moves[0]) = (moves[0], moves[s]);
+        for (int i = 0; i < moves.Length; i++){
+            if (moves[i].IsCapture){
+                moveScores[i] = pieceValues[(int)moves[i].CapturePieceType] - pieceValues[(int)moves[i].MovePieceType];
+            }
+        }
+        Array.Sort(moveScores, moves);
+        Array.Reverse(moves);
+        return moves;
     }
 }

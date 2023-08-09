@@ -40,7 +40,10 @@ namespace ChessChallenge.Example
             }
 
             Move[] moves = board.GetLegalMoves();
-
+            Random rng = new();
+            int s = rng.Next(moves.Length);
+            (moves[s], moves[0]) = (moves[0], moves[s]);
+            
             if (moves.Length == 0){
                 return 0;
             }
