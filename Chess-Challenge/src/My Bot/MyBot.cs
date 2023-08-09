@@ -9,40 +9,27 @@ public class MyBot : IChessBot
     readonly int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
     readonly int alphaBetaLimit = 13900;
     readonly TimeSpan timeout = TimeSpan.FromMilliseconds(1000);
-    readonly int delta = 50;
-    Dictionary<ulong, Tuple<int, int>> trans = new();
-    private Move bestMove;
-    int searchDepth;
+    Dictionary<ulong, Tuple<int, int, Move>> trans = new();
     DateTime startTime;
 
 
     public Move Think(Board board, Timer timer)
     {
-        int score = int.MinValue;
-        int aspirationAlpha = -alphaBetaLimit;
-        int aspirationBeta = alphaBetaLimit;
+        int score;
+        int bestSearchDepth = 0;
+        Move moveToPlay = new();
         startTime = DateTime.UtcNow;
-        bestMove = Move.NullMove;
+
         try{
             for (int i = 1; i < 10; i++){
-                searchDepth = i;
-                if (searchDepth > 1){
-                    aspirationAlpha = score - delta;
-                    aspirationBeta = score + delta;
-                }
-                score = Search(board, searchDepth, aspirationAlpha, aspirationBeta);
-
-                if (score <= aspirationAlpha){
-                    score = Search(board, searchDepth, -alphaBetaLimit, aspirationBeta);
-                }else if (score >= aspirationBeta){
-                    score = Search(board, searchDepth, aspirationAlpha, alphaBetaLimit);
-                }
+                bestSearchDepth = i;
+                (score, moveToPlay) = Search(board, i, -alphaBetaLimit, alphaBetaLimit);
             }
         }catch(Exception){
-            Console.WriteLine("Level {0} Move: " + bestMove.ToString(),searchDepth-1);
+            Console.WriteLine("Level {0} Move: " + moveToPlay.ToString(),bestSearchDepth-1);
         }
         
-        return bestMove;
+        return moveToPlay;
     }
 
     private int Evaluate(Board board)
@@ -57,16 +44,16 @@ public class MyBot : IChessBot
         return totalValue;
     }
 
-    int Search (Board board, int depth, int alpha, int beta){
+    Tuple<int,Move> Search (Board board, int depth, int alpha, int beta){
         if (DateTime.UtcNow - startTime > timeout){throw new Exception("Search Halted");}
 
         ulong zKey = board.ZobristKey;
         if (trans.ContainsKey(zKey) && trans[zKey].Item2 >= depth){
-            return trans[zKey].Item1;
+            return new Tuple<int, Move>(trans[zKey].Item1, trans[zKey].Item3);
         }
 
         if (depth == 0){
-            return Quiesce(board, alpha, beta);
+            return new Tuple<int, Move>(Quiesce(board, alpha, beta), Move.NullMove);
         }
 
         Move[] moves = board.GetLegalMoves();
@@ -75,10 +62,10 @@ public class MyBot : IChessBot
         (moves[0], moves[rngIndex]) = (moves[rngIndex], moves[0]);
 
         if (moves.Length == 0){
-            return 0;
+            return new Tuple<int, Move>(0, Move.NullMove);
         }
 
-        Move currentBestMove = moves[0];
+        Move bestMove = moves[0];
         int score;
         foreach (Move move in moves){
             board.MakeMove(move);
@@ -87,25 +74,21 @@ public class MyBot : IChessBot
             }else if (board.IsDraw()){
                 score = 0;
             }else{
-                score = -Search(board, depth - 1, -beta, -alpha);
+                score = -Search(board, depth - 1, -beta, -alpha).Item1;
             }
             
             board.UndoMove(move);
             if (score >= beta){
-                return beta;
+                return new Tuple<int, Move>(beta,Move.NullMove);
             }
 
             if (score > alpha){
                 alpha = score;
-                currentBestMove = move;
+                bestMove = move;
             }
         }
-        if (depth == searchDepth){
-            this.bestMove = currentBestMove;
-        }
-
-        trans[zKey] = new Tuple<int, int>(alpha, depth);
-        return alpha;
+        trans[zKey] = new Tuple<int, int, Move>(alpha, depth, bestMove);
+        return new Tuple<int, Move>(alpha, bestMove);
     }
 
 
