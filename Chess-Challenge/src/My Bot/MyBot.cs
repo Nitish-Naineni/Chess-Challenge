@@ -62,7 +62,20 @@ public class MyBot : IChessBot
         }
 
         Move[] moves = board.GetLegalMoves();
+        int[] moveScores = new int[moves.Length];
+        for (int i = 0; i < moves.Length ; i++){
+            if (moves[i] == entry.move){
+                moveScores[i] = int.MaxValue;
+            }else if (moves[i].IsCapture){
+                moveScores[i] = 100 * (int)moves[i].CapturePieceType - (int)moves[i].MovePieceType;
+            } 
+        }
         for(int i=0; i<moves.Length; i++){
+            for (int j = i + 1; j < moves.Length; j++){
+				if (moveScores[j] > moveScores[i]){
+                    (moveScores[i], moveScores[j], moves[i], moves[j]) = (moveScores[j], moveScores[i], moves[j], moves[i]);
+                }
+			}
             board.MakeMove(moves[i]);
             int score = -Search(board, -beta, -alpha, depth - 1);
             board.UndoMove(moves[i]);

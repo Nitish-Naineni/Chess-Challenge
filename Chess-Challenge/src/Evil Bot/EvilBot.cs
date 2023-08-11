@@ -10,7 +10,7 @@ namespace ChessChallenge.Example
     {
         // Piece values: null, pawn, knight, bishop, rook, queen, king
         readonly int[] pieceValues = { 0, 10, 30, 30, 50, 90, 1000 };
-        readonly int searchDepth = 4;
+        readonly int searchDepth = 5;
         Move moveToPlay;
         public Move Think(Board board, Timer timer)
         {
