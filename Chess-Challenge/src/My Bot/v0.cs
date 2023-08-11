@@ -1,34 +1,19 @@
-using System;
-using System.Collections.Generic;
 using ChessChallenge.API;
+using System;
+using System.Numerics;
+using System.Collections.Generic;
+using System.Linq;
 
 public class MyBotv0 : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
-    readonly int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
-    readonly TimeSpan timeout = TimeSpan.FromMilliseconds(1000);
-    Dictionary<ulong, (int, int, Move)> trans = new();
-    Dictionary<ulong, Move[]> moveHistroy;
-    DateTime startTime;
-
-
+    readonly int[] pieceValues = { 0, 10, 30, 30, 50, 90, 1000 };
+    readonly int searchDepth = 6;
+    Move moveToPlay;
     public Move Think(Board board, Timer timer)
     {
-        int score;
-        int bestSearchDepth = 0;
-        Move moveToPlay = new();
-        moveHistroy = new();
-        startTime = DateTime.UtcNow;
-
-        try{
-            for (int i = 1; i < 10; i++){
-                bestSearchDepth = i;
-                (score, moveToPlay) = Search(board, i, -13900, 13900);
-            }
-        }catch(Exception){
-            Console.WriteLine("Level {0} Move: " + moveToPlay.ToString(),bestSearchDepth-1);
-        }
-        
+        moveToPlay = Move.NullMove;
+        int score = Search(board, -int.MaxValue, int.MaxValue, searchDepth);
         return moveToPlay;
     }
 
@@ -40,75 +25,34 @@ public class MyBotv0 : IChessBot
             int value = Pieces.Count * pieceValues[(int)Pieces.TypeOfPieceInList];
             totalValue += board.IsWhiteToMove == Pieces.IsWhitePieceList ? value : -value;
         }
-
         return totalValue;
     }
 
-    (int,Move) Search (Board board, int depth, int alpha, int beta){
-        if (DateTime.UtcNow - startTime > timeout){throw new Exception("Search Halted");}
+    int Search (Board board, int alpha, int beta, int depth){
+        int bestScore = -int.MaxValue;
+        Move bestMove = Move.NullMove;
 
-        ulong zKey = board.ZobristKey;
-        if (trans.ContainsKey(zKey) && trans[zKey].Item2 >= depth){return (trans[zKey].Item1, trans[zKey].Item3);}
-        if (depth == 0){return (Quiesce(board, alpha, beta), Move.NullMove);}
+        if (depth == 0){
+            bestScore = Evaluate(board);
+            if (bestScore >= beta) return bestScore;
+            alpha = Math.Max(alpha, bestScore);
+            return alpha;
+        }
 
-        Move[] moves = moveHistroy.ContainsKey(zKey) ? moveHistroy[zKey] : OrderMoves(board.GetLegalMoves());
-        if (moves.Length == 0){return (0, Move.NullMove);}
-
-        int[] moveScores = new int[moves.Length];
-        for (int i = 0; i < moveScores.Length; i++){moveScores[i] = int.MinValue;}
-
-        Random rng = new();
-        Move bestMove = moves[rng.Next(moves.Length)];
-
-        for (int i = 0; i < moves.Length; i++){
+        Move[] moves = board.GetLegalMoves();
+        for(int i=0; i<moves.Length; i++){
             board.MakeMove(moves[i]);
-            int score;
-            if (board.IsDraw()){
-                score = -pieceValues[6]/2;
-            }else{
-                score = board.IsInCheckmate() ? pieceValues[6] : -Search(board, depth - 1, -beta, -alpha).Item1;
-            }
-            moveScores[i] = score;
+            int score = -Search(board, -beta, -alpha, depth - 1);
             board.UndoMove(moves[i]);
-
-            if (score >= beta){return (beta,Move.NullMove);}
-            if (score > alpha){(alpha, bestMove) = (score, moves[i]);}
+            if (score > bestScore){
+                bestScore = score;
+                bestMove = moves[i];
+                alpha = Math.Max(alpha, score);
+                if (alpha >= beta) break;
+            }
         }
-        Array.Sort(moveScores, moves);
-        Array.Reverse(moves);
-        moveHistroy[zKey] = moves;
-
-        trans[zKey] = (alpha, depth, bestMove);
-        return (alpha, bestMove);
-    }
-
-
-    int Quiesce(Board board, int alpha, int beta) {
-        if (DateTime.UtcNow - startTime > timeout){throw new Exception("Search Halted");}
-
-        int stand_pat = Evaluate(board);
-        if (stand_pat >= beta){return beta;}
-        if (alpha < stand_pat){alpha = stand_pat;}
-
-        Move[] captures = board.GetLegalMoves(true);
-        foreach (Move capture in captures) {
-            board.MakeMove(capture);
-            int score = -Quiesce(board, -beta, -alpha);
-            board.UndoMove(capture);
-
-            if (score >= beta){return beta;}
-            if (score > alpha){alpha = score;}
-        }
-        return alpha;
-    }
-
-    Move[] OrderMoves(Move[] moves){
-        int[] moveScores = new int[moves.Length];
-        for (int i = 0; i < moves.Length; i++){
-            if (moves[i].IsCapture){moveScores[i] = pieceValues[(int)moves[i].CapturePieceType] - pieceValues[(int)moves[i].MovePieceType];}
-        }
-        Array.Sort(moveScores, moves);
-        Array.Reverse(moves);
-        return moves;
+        if (moves.Length == 0) return board.IsInCheck() ? -pieceValues[6] + (searchDepth - depth) : 0;
+        if (depth == searchDepth) moveToPlay = bestMove;
+        return bestScore;
     }
 }

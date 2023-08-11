@@ -1,4 +1,4 @@
-﻿using ChessChallenge.API;
+using ChessChallenge.API;
 using System;
 using System.Numerics;
 using System.Collections.Generic;
@@ -6,11 +6,11 @@ using System.Linq;
 
 namespace ChessChallenge.Example
 {
-    public class EvilBot : IChessBot
+    public class EvilBotv1 : IChessBot
     {
         // Piece values: null, pawn, knight, bishop, rook, queen, king
         readonly int[] pieceValues = { 0, 10, 30, 30, 50, 90, 1000 };
-        readonly int searchDepth = 4;
+        readonly int searchDepth = 6;
         Move moveToPlay;
         public Move Think(Board board, Timer timer)
         {
@@ -33,7 +33,6 @@ namespace ChessChallenge.Example
         int Search (Board board, int alpha, int beta, int depth){
             int bestScore = -int.MaxValue;
             Move bestMove = Move.NullMove;
-            if (searchDepth != depth && board.IsRepeatedPosition()){return 0;}
 
             if (depth == 0){
                 bestScore = Evaluate(board);
