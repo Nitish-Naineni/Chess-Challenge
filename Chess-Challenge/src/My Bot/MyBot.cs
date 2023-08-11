@@ -7,11 +7,13 @@ using System.Linq;
 public class MyBot : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
-    readonly int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
-
+    readonly int[] pieceValues = { 0, 1, 3, 3, 5, 9, 100 };
+    readonly int searchDepth = 5;
+    Move moveToPlay;
     public Move Think(Board board, Timer timer)
     {
-        (int score, Move moveToPlay) = Search(board, 7, -int.MaxValue, int.MaxValue);
+        moveToPlay = Move.NullMove;
+        int score = Search(board, -int.MaxValue, int.MaxValue, searchDepth);
         return moveToPlay;
     }
 
@@ -26,21 +28,31 @@ public class MyBot : IChessBot
         return totalValue;
     }
 
-    (int,Move) Search (Board board, int depth, int alpha, int beta){
-        if (depth == 0){return (Evaluate(board), Move.NullMove);}
-        Move[] moves = board.GetLegalMoves();
-        if (moves.Length == 0){return (0, Move.NullMove);}
-        Random rng = new();
-        Move bestMove = moves[rng.Next(moves.Length)];
+    int Search (Board board, int alpha, int beta, int depth){
+        int bestScore = -int.MaxValue;
+        Move bestMove = Move.NullMove;
 
-        for (int i = 0; i < moves.Length; i++){
-            board.MakeMove(moves[i]);
-            int score = board.IsInCheckmate() ? pieceValues[6] : -Search(board, depth - 1, -beta, -alpha).Item1;
-            board.UndoMove(moves[i]);
-
-            if (score >= beta){return (beta,Move.NullMove);}
-            if (score > alpha){(alpha, bestMove) = (score, moves[i]);}
+        if (depth == 0){
+            bestScore = Evaluate(board);
+            if (bestScore >= beta) return bestScore;
+            alpha = Math.Max(alpha, bestScore);
+            return alpha;
         }
-        return (alpha, bestMove);
+
+        Move[] moves = board.GetLegalMoves();
+        for(int i=0; i<moves.Length; i++){
+            board.MakeMove(moves[i]);
+            int score = -Search(board, -beta, -alpha, depth - 1);
+            board.UndoMove(moves[i]);
+            if (score > bestScore){
+                bestScore = score;
+                bestMove = moves[i];
+                alpha = Math.Max(alpha, score);
+                if (alpha >= beta) break;
+            }
+        }
+        if (moves.Length == 0) return board.IsInCheck() ? -pieceValues[6]*2 + (searchDepth - depth) : 0;
+        if (depth == searchDepth) moveToPlay = bestMove;
+        return bestScore;
     }
 }
