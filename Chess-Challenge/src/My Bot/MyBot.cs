@@ -7,8 +7,8 @@ using System.Linq;
 public class MyBot : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
-    readonly int[] pieceValues = { 0, 1, 3, 3, 5, 9, 100 };
-    readonly int searchDepth = 5;
+    readonly int[] pieceValues = { 0, 10, 30, 30, 50, 90, 1000 };
+    readonly int searchDepth = 6;
     Move moveToPlay;
     public Move Think(Board board, Timer timer)
     {
@@ -51,7 +51,7 @@ public class MyBot : IChessBot
                 if (alpha >= beta) break;
             }
         }
-        if (moves.Length == 0) return board.IsInCheck() ? -pieceValues[6]*2 + (searchDepth - depth) : 0;
+        if (moves.Length == 0) return board.IsInCheck() ? -pieceValues[6] + (searchDepth - depth) : 0;
         if (depth == searchDepth) moveToPlay = bestMove;
         return bestScore;
     }
