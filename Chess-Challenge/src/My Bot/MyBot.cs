@@ -46,6 +46,7 @@ public class MyBot : IChessBot
         int bestScore = -int.MaxValue;
         Move bestMove = Move.NullMove;
         int origAlpha = alpha;
+        bool firstMove = true;
         if (searchDepth != depth && board.IsRepeatedPosition()){return 0;}
         TTEntry entry = new();
         if(transTable.ContainsKey(board.ZobristKey)){
@@ -60,7 +61,7 @@ public class MyBot : IChessBot
             }
         }
 
-        if (depth == 0){
+        if (depth <= 0){
             bestScore = Evaluate(board);
             if (bestScore >= beta) return bestScore;
             alpha = Math.Max(alpha, bestScore);
@@ -71,13 +72,23 @@ public class MyBot : IChessBot
         int[] moveScores = GetMoveScores(moves, entry.move);
         
         for(int i=0; i<moves.Length; i++){
+            int score;
             for (int j = i + 1; j < moves.Length; j++){
 				if (moveScores[j] > moveScores[i]){
                     (moveScores[i], moveScores[j], moves[i], moves[j]) = (moveScores[j], moveScores[i], moves[j], moves[i]);
                 }
 			}
             board.MakeMove(moves[i]);
-            int score = -Search(board, -beta, -alpha, depth - 1);
+            if (firstMove){
+                firstMove = false;
+                score = -Search(board, -beta, -alpha, depth - 1);
+            }else{
+                score = -Search(board, -alpha-1, -alpha, depth - 1);
+                if( score > alpha && score < beta ) {
+                    score = -Search(board, -beta, -alpha, depth-1);
+                    if( score > alpha ){alpha = score;}
+                }
+            }
             board.UndoMove(moves[i]);
             if (score > bestScore){
                 bestScore = score;
