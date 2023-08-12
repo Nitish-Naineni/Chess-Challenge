@@ -8,7 +8,7 @@ public class MyBot : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
     readonly int[] pieceValues = { 0, 10, 30, 30, 50, 90, 1000 };
-    readonly int searchDepth = 5;
+    readonly int searchDepth = 4;
     Move moveToPlay;
     Dictionary<ulong , TTEntry> transTable = new();
 
@@ -27,13 +27,19 @@ public class MyBot : IChessBot
     }
 
     private int Evaluate(Board board){
-        int totalValue = 0;
+        int materialScore  = 0;
         PieceList[] allPieces = board.GetAllPieceLists();
         foreach (PieceList Pieces in allPieces){
             int value = Pieces.Count * pieceValues[(int)Pieces.TypeOfPieceInList];
-            totalValue += board.IsWhiteToMove == Pieces.IsWhitePieceList ? value : -value;
+            materialScore  += board.IsWhiteToMove == Pieces.IsWhitePieceList ? value : -value;
         }
-        return totalValue;
+        int mobilityScore = board.GetLegalMoves().Length;
+        board.ForceSkipTurn();
+        mobilityScore -= board.GetLegalMoves().Length;
+        board.UndoSkipTurn();
+
+
+        return materialScore + mobilityScore * 1;
     }
 
     int Search (Board board, int alpha, int beta, int depth){
@@ -62,14 +68,8 @@ public class MyBot : IChessBot
         }
 
         Move[] moves = board.GetLegalMoves();
-        int[] moveScores = new int[moves.Length];
-        for (int i = 0; i < moves.Length ; i++){
-            if (moves[i] == entry.move){
-                moveScores[i] = int.MaxValue;
-            }else if (moves[i].IsCapture){
-                moveScores[i] = 100 * (int)moves[i].CapturePieceType - (int)moves[i].MovePieceType;
-            } 
-        }
+        int[] moveScores = GetMoveScores(moves, entry.move);
+        
         for(int i=0; i<moves.Length; i++){
             for (int j = i + 1; j < moves.Length; j++){
 				if (moveScores[j] > moveScores[i]){
@@ -91,5 +91,17 @@ public class MyBot : IChessBot
         int bound = bestScore >= beta ? 2 : bestScore > origAlpha ? 3 : 1;
         if (entry.depth < depth) transTable[board.ZobristKey] = new TTEntry(bestMove, depth, bestScore, bound);
         return bestScore;
+    }
+
+    int[] GetMoveScores(Move[] moves, Move lastBestMove){
+        int[] moveScores = new int[moves.Length];
+        for (int i = 0; i < moves.Length ; i++){
+            if (moves[i] == lastBestMove){
+                moveScores[i] = int.MaxValue;
+            }else if (moves[i].IsCapture){
+                moveScores[i] = 100 * (int)moves[i].CapturePieceType - (int)moves[i].MovePieceType;
+            } 
+        }
+        return moveScores;
     }
 }
