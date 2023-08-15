@@ -8,7 +8,7 @@ public class MyBot : IChessBot
     Board board; Timer timer; Move moveToPlay;
     record struct TTEntry(Move move, int depth, int score, int bound);
     Dictionary<ulong , TTEntry> transTable = new();
-    int[,,] historyTable;
+    Dictionary<Move, int> historyTable;
     // Piece values: pawn, knight, bishop, rook, queen, king
     private readonly short[] pieceValues = {82, 337, 365, 477, 1025, 20000,  // Middlegame
                                             94, 281, 297, 512, 936,  20000}; // Endgame
@@ -30,8 +30,8 @@ public class MyBot : IChessBot
 
     public Move Think(Board _Board, Timer _Timer){
         board = _Board; timer = _Timer;
-        historyTable = new int[2, 7, 64];
-        for (int depth = 1; depth < 6; depth++){
+        historyTable = new();
+        for (int depth = 1; depth <= 5; depth++){
             Search(-maxValue, maxValue, depth, 0);
         }
         return moveToPlay;
@@ -75,9 +75,9 @@ public class MyBot : IChessBot
 
         Move[] moves = board.GetLegalMoves(quiesce&& !in_check).OrderByDescending(
             move => 
-                move.Equals(entry.move)? 1000000 :
+                move.Equals(entry.move)? maxValue :
                 move.IsCapture ? 100 * (int)move.CapturePieceType - (int)move.MovePieceType :
-                historyTable[turn, (int)move.MovePieceType, move.TargetSquare.Index]
+                historyTable.GetValueOrDefault(move, 0)
         ).ToArray();
 
         if (!quiesce && moves.Length == 0) return board.IsInCheck() ? -pieceValues[5] + ply : 0;
@@ -100,7 +100,7 @@ public class MyBot : IChessBot
                 (bestScore, alpha) = (score, Math.Max(alpha, score));
                 if(root) moveToPlay = move;
                 if (alpha >= beta){
-                    if (!quiesce && !move.IsCapture) historyTable[turn, (int)move.MovePieceType, move.TargetSquare.Index] += depth * depth;
+                    if (!move.IsCapture) historyTable[move] = historyTable.GetValueOrDefault(move, 0) + depth * depth;
                     break;
                 }
             }
