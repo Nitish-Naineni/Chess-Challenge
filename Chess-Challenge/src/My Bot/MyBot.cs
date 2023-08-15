@@ -31,7 +31,8 @@ public class MyBot : IChessBot
     public Move Think(Board _Board, Timer _Timer){
         board = _Board; timer = _Timer;
         historyTable = new();
-        for (int depth = 1; depth <= 5; depth++){
+        // Iterative Deepening
+        for (int depth = 1; depth <= 6; depth++){
             Search(-maxValue, maxValue, depth, 0);
         }
         return moveToPlay;
@@ -67,13 +68,23 @@ public class MyBot : IChessBot
         ( entry.bound == 0 || (entry.bound == 1 && entry.score >= beta) || (entry.bound == 2 && entry.score <= alpha))
         ) return entry.score;
 
+        // Quiescence Search
         if (quiesce){
             bestScore = Evaluate();
             if (bestScore >= beta) return beta;
             alpha = Math.Max(alpha,bestScore);
         }
 
-        Move[] moves = board.GetLegalMoves(quiesce&& !in_check).OrderByDescending(
+        // Null move pruning
+        if (!quiesce && !root && !in_check && depth >= 3){
+            board.TrySkipTurn();
+            int nullScore = -Search(-beta, -beta+1, depth-3, ply+1);
+            board.UndoSkipTurn();
+            if (nullScore >= beta) return beta;
+        }
+
+        // Move Ordering
+        Move[] moves = board.GetLegalMoves(quiesce && !in_check).OrderByDescending(
             move => 
                 move.Equals(entry.move)? maxValue :
                 move.IsCapture ? 100 * (int)move.CapturePieceType - (int)move.MovePieceType :
@@ -85,6 +96,7 @@ public class MyBot : IChessBot
         foreach (Move move in moves)
         {
             board.MakeMove(move);
+            // Principal Variation Search
             int PVS(int newAlpha) => -Search(newAlpha, -alpha, depth - 1, ply + 1);
             score = PVS(firstMove ? -beta : -alpha - 1);
             if (!firstMove && score > alpha)
