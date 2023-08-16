@@ -6,8 +6,8 @@ using System.Linq;
 public class MyBot : IChessBot
 {
     Board board; Timer timer; Move moveToPlay;
-    record struct TTEntry(Move move, int depth, int score, int bound);
-    Dictionary<ulong , TTEntry> transTable = new();
+    record struct TTEntry(ulong Key, Move move, int depth, int score, int bound);
+    TTEntry[] transTable = new TTEntry[0x400000];
     Dictionary<Move, int> historyTable;
     // Piece values: pawn, knight, bishop, rook, queen, king
     private readonly short[] pieceValues = {82, 337, 365, 477, 1025, 20000,  // Middlegame
@@ -32,7 +32,7 @@ public class MyBot : IChessBot
         board = _Board; timer = _Timer;
         historyTable = new();
         // Iterative Deepening
-        for (int depth = 1; depth <= 9; depth++){
+        for (int depth = 1; depth <= 6; depth++){
             nodes = 0;
             Search(-maxValue, maxValue, depth, 0);
             Console.WriteLine("depth\t{0} nodes\t{1}",depth,nodes);
@@ -78,11 +78,13 @@ public class MyBot : IChessBot
         nodes++;
         int origAlpha = alpha, bestScore = -maxValue, score, turn = board.IsWhiteToMove? 1 : 0;
         bool firstMove = true, root = ply == 0 , quiesce = depth < 1, in_check = board.IsInCheck();
+        ulong zKey = board.ZobristKey;
         Move bestMove = Move.NullMove;
 
         if (!root && board.IsRepeatedPosition()) return 0;
 
-        if (transTable.TryGetValue(board.ZobristKey, out TTEntry entry) && entry.depth >= depth && !root &&
+        TTEntry entry = transTable[zKey & 0x3FFFFF];
+        if (entry.Key == zKey  && !root && entry.depth >= depth &&
         ( entry.bound == 0 || (entry.bound == 1 && entry.score >= beta) || (entry.bound == 2 && entry.score <= alpha))
         ) return entry.score;
 
@@ -96,7 +98,7 @@ public class MyBot : IChessBot
         // Null move pruning
         if (!quiesce && !root && !in_check && depth > 2){
             board.TrySkipTurn();
-            int nullScore = -Search(-beta, -beta+1, 2, ply+1);
+            int nullScore = -Search(-beta, -beta+1, Math.Max(2,depth - 3), ply+1);
             board.UndoSkipTurn();
             if (nullScore >= beta) return beta;
         }
@@ -137,7 +139,7 @@ public class MyBot : IChessBot
             firstMove = false;
         }
 
-        if (entry.depth < depth) transTable[board.ZobristKey] = new TTEntry(bestMove, depth, bestScore, bestScore >= beta ? 1 : bestScore > origAlpha ? 0 : 2);
+        if (entry.depth < depth) transTable[zKey & 0x3FFFFF] = new TTEntry(zKey, bestMove, depth, bestScore, bestScore >= beta ? 1 : bestScore > origAlpha ? 0 : 2);
         
         return bestScore;
     }
