@@ -1,14 +1,14 @@
-﻿using ChessChallenge.API;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
+using ChessChallenge.API;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
-public class MyBot : IChessBot
+public class alphaBeta : IChessBot
 {
     Board board; Timer timer; Move moveToPlay;
-    record struct TTEntry(ulong zKey, Move move, int depth, int score, int bound);
+    record struct TTEntry(ulong Key, Move move, int depth, int score, int bound);
     TTEntry[] transTable = new TTEntry[0x400000];
-    int[,,] historyTable;
+    Dictionary<Move, int> historyTable;
     // Piece values: pawn, knight, bishop, rook, queen, king
     private readonly short[] pieceValues = {82, 337, 365, 477, 1025, 20000,  // Middlegame
                                             94, 281, 297, 512, 936,  20000}; // Endgame
@@ -17,7 +17,7 @@ public class MyBot : IChessBot
     readonly int[] phase_weight = { 0, 1, 1, 2, 4, 0 };
     int maxValue = 100000, nodes;
 
-    public MyBot(){
+    public alphaBeta(){
         UnpackedPestoTables = new int[64][];
         for (int i = 0; i < 64; i++){
             int pieceType = 0;
@@ -30,7 +30,7 @@ public class MyBot : IChessBot
 
     public Move Think(Board _Board, Timer _Timer){
         board = _Board; timer = _Timer;
-        historyTable = new int[2, 7, 64];
+        historyTable = new();
         // Iterative Deepening
         for (int depth = 1; depth <= 6; depth++){
             nodes = 0;
@@ -56,6 +56,10 @@ public class MyBot : IChessBot
             midGameEval = -midGameEval;
             endGameEval = -endGameEval;
         }
+        // if (board.GetPieceList(PieceType.Bishop, board.IsWhiteToMove).Count > 1){
+        //     midGameEval += 10;
+        //     endGameEval += 10;
+        // }
         phase = Math.Min(phase, 24);
         return (midGameEval * phase + endGameEval * (24 - phase)) / 24 * (board.IsWhiteToMove ? 1 : -1);
     }
@@ -72,21 +76,18 @@ public class MyBot : IChessBot
     int Search(int alpha, int beta, int depth, int ply)
     {
         nodes++;
-        
-        bool firstMove = true, root = ply == 0 , quiesce = depth < 1, inCheck = board.IsInCheck(), isWhite = board.IsWhiteToMove;
-        int origAlpha = alpha, bestScore = -maxValue, score, turn = isWhite? 1 : 0;
+        int origAlpha = alpha, bestScore = -maxValue, score, turn = board.IsWhiteToMove? 1 : 0;
+        bool firstMove = true, root = ply == 0 , quiesce = depth < 1, in_check = board.IsInCheck();
         ulong zKey = board.ZobristKey;
+        Move bestMove = Move.NullMove;
 
         if (!root && board.IsRepeatedPosition()) return 0;
 
         TTEntry entry = transTable[zKey & 0x3FFFFF];
-        if (entry.zKey == zKey  && !root && entry.depth >= depth &&
+        if (entry.Key == zKey  && !root && entry.depth >= depth &&
         ( entry.bound == 0 || (entry.bound == 1 && entry.score >= beta) || (entry.bound == 2 && entry.score <= alpha))
         ) return entry.score;
 
-        // Extensions
-        if(!quiesce && inCheck) depth++;
-        
         // Quiescence Search
         if (quiesce){
             bestScore = Evaluate();
@@ -95,7 +96,7 @@ public class MyBot : IChessBot
         }
 
         // Null move pruning
-        if (!quiesce && !root && !inCheck && depth > 2){
+        if (!quiesce && !root && !in_check && depth > 2){
             board.TrySkipTurn();
             int nullScore = -Search(-beta, -beta+1, Math.Max(2,depth - 3), ply+1);
             board.UndoSkipTurn();
@@ -103,11 +104,11 @@ public class MyBot : IChessBot
         }
 
         // Move Ordering
-        Move[] moves = board.GetLegalMoves(quiesce && !inCheck).OrderByDescending(
+        Move[] moves = board.GetLegalMoves(quiesce && !in_check).OrderByDescending(
             move => 
                 move.Equals(entry.move)? maxValue :
                 move.IsCapture ? 100 * (int)move.CapturePieceType - (int)move.MovePieceType :
-                historyTable[turn, (int)move.MovePieceType, move.TargetSquare.Index]
+                historyTable.GetValueOrDefault(move, 0)
         ).ToArray();
 
         if (!quiesce && moves.Length == 0) return board.IsInCheck() ? -pieceValues[5] + ply : 0;
@@ -131,14 +132,14 @@ public class MyBot : IChessBot
                 (bestScore, alpha) = (score, Math.Max(alpha, score));
                 if(root) moveToPlay = move;
                 if (alpha >= beta){
-                    if (!move.IsCapture) historyTable[turn, (int)move.MovePieceType, move.TargetSquare.Index] += depth * depth;
+                    if (!move.IsCapture) historyTable[move] = historyTable.GetValueOrDefault(move, 0) + depth * depth;
                     break;
                 }
             }
             firstMove = false;
         }
 
-        if (!quiesce && entry.depth < depth) transTable[zKey & 0x3FFFFF] = new TTEntry(zKey, moveToPlay, depth, bestScore, bestScore >= beta ? 1 : bestScore > origAlpha ? 0 : 2);
+        if (entry.depth < depth) transTable[zKey & 0x3FFFFF] = new TTEntry(zKey, bestMove, depth, bestScore, bestScore >= beta ? 1 : bestScore > origAlpha ? 0 : 2);
         
         return bestScore;
     }
